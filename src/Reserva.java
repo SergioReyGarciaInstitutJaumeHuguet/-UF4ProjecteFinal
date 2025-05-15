@@ -102,9 +102,15 @@ public class Reserva implements Serializable {
 
     @Override
     public String toString() {
+        String habitacioInfo = (habitacio != null) ?
+                String.valueOf(habitacio.getNumeroHabitacio()) : "No disponible";
+
+        String clientInfo = (client != null) ?
+                client.getNom() + " " + client.getCognoms() : "No disponible";
+
         return "Reserva [ID: " + idReserva +
-                ", Habitació: " + habitacio.getNumeroHabitacio() +
-                ", Client: " + client.getNom() + " " + client.getCognoms() +
+                ", Habitació: " + habitacioInfo +
+                ", Client: " + clientInfo +
                 ", Data Entrada: " + dataEntrada +
                 ", Data Sortida: " + dataSortida +
                 ", Total a Pagar: " + totalAPagar + "€]";

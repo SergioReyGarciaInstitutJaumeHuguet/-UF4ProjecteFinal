@@ -130,21 +130,73 @@ public class ReservaDAO {
      * @return Una llista amb totes les reserves actives.
      */
     public List<Reserva> obtenirReservesActives() {
-        String sql = "SELECT * FROM reserves WHERE data_sortida >= CURRENT_DATE() ORDER BY data_entrada";
+        System.out.println("Iniciando obtenirReservesActives()");
         List<Reserva> reserves = new ArrayList<>();
+        String sql = "SELECT * FROM reserves WHERE data_sortida >= CURRENT_DATE() ORDER BY data_entrada";
+
+        // Listas para almacenar IDs temporalmente
+        List<Integer> reservaIds = new ArrayList<>();
+        List<Integer> habitacioIds = new ArrayList<>();
+        List<Integer> clientIds = new ArrayList<>();
 
         try (Connection conn = ConnectionManager.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
-            while (rs.next()) {
-                reserves.add(mapResultSetToReserva(rs));
-            }
+            System.out.println("Consulta ejecutada correctamente");
 
+            while (rs.next()) {
+                int idReserva = rs.getInt("id_reserva");
+                int numeroHabitacio = rs.getInt("numero_habitacio");
+                int idClient = rs.getInt("id_client");
+                LocalDate dataEntrada = rs.getDate("data_entrada").toLocalDate();
+                LocalDate dataSortida = rs.getDate("data_sortida").toLocalDate();
+
+                // Guardar IDs para uso posterior
+                reservaIds.add(idReserva);
+                habitacioIds.add(numeroHabitacio);
+                clientIds.add(idClient);
+
+                // Crear la reserva con datos básicos
+                Reserva reserva = new Reserva();
+                reserva.setIdReserva(idReserva);
+                reserva.setDataEntrada(dataEntrada);
+                reserva.setDataSortida(dataSortida);
+
+                reserves.add(reserva);
+            }
         } catch (SQLException e) {
-            System.err.println("Error en obtenir les reserves actives: " + e.getMessage());
+            System.err.println("Error al consultar reservas: " + e.getMessage());
+            e.printStackTrace();
+            return reserves; // Retornar lista vacía en caso de error
         }
 
+        // Ahora que el ResultSet está cerrado, completar las reservas con habitaciones y clientes
+        for (int i = 0; i < reserves.size(); i++) {
+            Reserva reserva = reserves.get(i);
+
+            // Obtener y establecer la habitación
+            try {
+                int numeroHabitacio = habitacioIds.get(i);
+                Habitacio habitacio = habitacioDAO.obtenirHabitacio(numeroHabitacio);
+                reserva.setHabitacio(habitacio);
+                System.out.println("Habitación obtenida correctamente: " + numeroHabitacio);
+            } catch (Exception e) {
+                System.err.println("Error al obtener la habitación: " + e.getMessage());
+            }
+
+            // Obtener y establecer el cliente
+            try {
+                int idClient = clientIds.get(i);
+                Client client = clientDAO.obtenirClient(idClient);
+                reserva.setClient(client);
+                System.out.println("Cliente obtenido correctamente: " + idClient);
+            } catch (Exception e) {
+                System.err.println("Error al obtener el cliente: " + e.getMessage());
+            }
+        }
+
+        System.out.println("Finalizando obtenirReservesActives() con " + reserves.size() + " reservas");
         return reserves;
     }
 
@@ -154,8 +206,12 @@ public class ReservaDAO {
      * @return Una llista amb totes les reserves del client.
      */
     public List<Reserva> obtenirReservesClient(int idClient) {
-        String sql = "SELECT * FROM reserves WHERE id_client = ? ORDER BY data_entrada";
+        System.out.println("Iniciando obtenirReservesClient() para cliente ID: " + idClient);
         List<Reserva> reserves = new ArrayList<>();
+        String sql = "SELECT * FROM reserves WHERE id_client = ? ORDER BY data_entrada";
+
+        // Lista para almacenar IDs de habitaciones temporalmente
+        List<Integer> habitacioIds = new ArrayList<>();
 
         try (Connection conn = ConnectionManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -163,15 +219,60 @@ public class ReservaDAO {
             stmt.setInt(1, idClient);
 
             try (ResultSet rs = stmt.executeQuery()) {
+                System.out.println("Consulta ejecutada correctamente");
+
                 while (rs.next()) {
-                    reserves.add(mapResultSetToReserva(rs));
+                    int idReserva = rs.getInt("id_reserva");
+                    int numeroHabitacio = rs.getInt("numero_habitacio");
+                    LocalDate dataEntrada = rs.getDate("data_entrada").toLocalDate();
+                    LocalDate dataSortida = rs.getDate("data_sortida").toLocalDate();
+
+                    // Guardar ID de habitación para uso posterior
+                    habitacioIds.add(numeroHabitacio);
+
+                    // Crear la reserva con datos básicos
+                    Reserva reserva = new Reserva();
+                    reserva.setIdReserva(idReserva);
+                    reserva.setDataEntrada(dataEntrada);
+                    reserva.setDataSortida(dataSortida);
+
+                    reserves.add(reserva);
                 }
             }
-
         } catch (SQLException e) {
-            System.err.println("Error en obtenir les reserves del client: " + e.getMessage());
+            System.err.println("Error al consultar reservas del cliente: " + e.getMessage());
+            e.printStackTrace();
+            return reserves; // Retornar lista vacía en caso de error
         }
 
+        // Obtener el cliente una sola vez (es el mismo para todas las reservas)
+        Client client = null;
+        try {
+            client = clientDAO.obtenirClient(idClient);
+            System.out.println("Cliente obtenido correctamente: " + client.getIdClient());
+        } catch (Exception e) {
+            System.err.println("Error al obtener el cliente: " + e.getMessage());
+        }
+
+        // Completar las reservas con el cliente y las habitaciones
+        for (int i = 0; i < reserves.size(); i++) {
+            Reserva reserva = reserves.get(i);
+
+            // Asignar el cliente
+            reserva.setClient(client);
+
+            // Obtener y establecer la habitación
+            try {
+                int numeroHabitacio = habitacioIds.get(i);
+                Habitacio habitacio = habitacioDAO.obtenirHabitacio(numeroHabitacio);
+                reserva.setHabitacio(habitacio);
+                System.out.println("Habitación obtenida correctamente: " + numeroHabitacio);
+            } catch (Exception e) {
+                System.err.println("Error al obtener la habitación: " + e.getMessage());
+            }
+        }
+
+        System.out.println("Finalizando obtenirReservesClient() con " + reserves.size() + " reservas");
         return reserves;
     }
 
